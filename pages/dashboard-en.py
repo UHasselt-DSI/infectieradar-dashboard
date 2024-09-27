@@ -1,7 +1,8 @@
-from dash import dcc, html, register_page
+from dash import dcc, html, register_page, callback, Input, Output, State
 import plotly.express as px
 import pandas as pd
 import json
+import sys
 
 register_page(__name__, path='/en')
 
@@ -10,21 +11,40 @@ colors = {"background": "#FFFFFF", "text": "#101010", "warning-text": "#FF4136"}
 # Bar - symptoms
 df_symptoms = pd.read_csv("data/en/symptoms.csv")
 
-symptom_fig = px.bar(
-    df_symptoms,
-    x="frequentie",
-    y="symptom",
-    orientation="h",
-    labels={"frequentie": "Frequency (%)", "symptom": "Symptom"},
-    color="frequentie",
-    color_continuous_scale="pinkyl",
-    template="plotly_white",
-    height=600
+# Prepare slider, value needs to be numeric so we need to map the dates to numbers
+symptom_slider = dcc.Slider(
+    min=0,
+    max=len(df_symptoms["week"].unique()) - 1,
+    marks={i: {"label": df_symptoms["week"].unique()[::-1][i], "style": {"transform": "rotate(45deg)", "margin-top": "15px"}} for i in range(len(df_symptoms["week"].unique()))},
+    value=len(df_symptoms["week"].unique()) - 1,
+    id="filter-symptom-week--slider",
+    step=1,
+    included=False,
 )
 
-symptom_fig.update_layout(yaxis={"categoryorder": "total ascending"})
+@callback(
+    Output("symptoms", "figure"),
+    Input("filter-symptom-week--slider", "value")
+)
+def update_symptoms_plot(week):
+    week = symptom_slider.marks[week]['label'] # have to convert the number back to a date for the dataframe
+    symptoms_snapshot = df_symptoms[df_symptoms["week"] == week]
+    symptom_fig = px.bar(
+        symptoms_snapshot,
+        x="frequentie",
+        y="symptom",
+        orientation="h",
+        labels={"frequentie": "Frequency (%)", "symptom": "Symptom"},
+        color="frequentie",
+        color_continuous_scale="pinkyl",
+        template="plotly_white",
+        height=600,
+        range_x=[0, df_symptoms["frequentie"].max()],
+        range_color=[0, df_symptoms["frequentie"].max()],
+    )
+    symptom_fig.update_layout(yaxis={"categoryorder": "total ascending"})
+    return symptom_fig
 
-weeks = ([x for x in range(25, 53)] + [x for  x in range(1, 25)])
 
 
 # If actual data is available, read in dataframe and append missing weeks
@@ -143,11 +163,11 @@ layout = html.Div(
                     """,
                     style={"textAlign": "left", "color": colors["text"]},
                 ),
-                dcc.Loading(
-                    [dcc.Graph(id="symptoms", figure=symptom_fig)],
-                    overlay_style={"visibility":"visible", "filter": "blur(2px)"},
-                    type="circle"
-                )
+                dcc.Graph(id="symptoms"),
+                html.Div(
+                    symptom_slider,
+                    style={'width': '85%', 'margin': 'auto'}
+                ),
             ],
             style={"paddingTop": "1rem"}
         ),
@@ -165,7 +185,7 @@ layout = html.Div(
                 ),
                 dcc.Graph(id="trendline_flu", figure=trendline_flu_fig)
             ],
-            style={"paddingTop": "1rem"}
+            style={"paddingTop": "3rem"}
         ),
         html.Div(
             children=[

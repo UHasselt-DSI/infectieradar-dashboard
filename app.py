@@ -1,7 +1,11 @@
 # Run this app with `python app.py` and
 # visit http://127.0.0.1:8050/ in your web browser.
+import os
 
 import dash
+
+from dotenv import load_dotenv
+load_dotenv()
 
 app = dash.Dash(
     __name__,
@@ -18,17 +22,15 @@ app = dash.Dash(
 )
 server = app.server
 
-colors = {"background": "#FFFFFF", "text": "#101010", "warning-text": "#FF4136"}
-
 app.layout = dash.html.Div(
-        [dash.dcc.Loading(dash.page_container, fullscreen=True, type="circle")], 
-        style={"backgroundColor": colors["background"], "padding": "0.5rem", "fontFamily": "Verdana, Geneva, sans-serif"},
+        dash.page_container, 
+        style={"backgroundColor": "#FFFFFF", "padding": "0.5rem", "fontFamily": "Verdana, Geneva, sans-serif"},
 )
 
-# Add CSP headers, should probably use .env file for this instead
+# Add CSP headers to allow for iframe embedding
 @app.server.after_request
 def modify_headers(response):
-    response.headers['Content-Security-Policy'] = "frame-ancestors 'self' https://*.infectieradar.be https://infectieradarbe.staging.influenzanet.info"
+    response.headers['Content-Security-Policy'] = f"frame-ancestors {os.getenv('CSP_FRAME_SRC')}"
     return response
 
 if __name__ == "__main__":
